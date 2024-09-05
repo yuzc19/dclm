@@ -72,6 +72,7 @@ def write_jsonl(data, file_path: str, mode: str = "w"):
     if is_s3(file_path):
         path = S3Path(file_path)
     else:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         path = LocalPath(file_path)
 
     if is_compressed(file_path):

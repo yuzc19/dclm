@@ -199,6 +199,7 @@ tmp*
 out*
 log*
 wandb*
+results*
 *_creds.sh
 plots*
 training/eval_data/*
@@ -217,3 +218,7 @@ eval/*.jsonl*
 secrets.env
 eval/sagemaker_scripts/configs/
 plotting/paper/experiments.csv
+run.sh
+launch.sh
+.torchxconfig
+refinedweb_banned_domains_curated.txt
