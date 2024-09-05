@@ -1,0 +1,9 @@
+- source: cc
+  steps:
+    - func: assign_dim_score_enricher
+      model_filename: /data/users/zichunyu/out/pythia-1b/fineweb/sample-100BT/10000-data_influence_model-flan-bs-1
+      key: dim_score
+    - func: quality_filter
+      key: dim_score
+      threshold: 0.018112
+      lower_better: True
