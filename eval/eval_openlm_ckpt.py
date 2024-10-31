@@ -260,6 +260,7 @@ def dump_or_update_output(args, local_rank, eval_metrics=None, helm_eval_metrics
     print("Eval output: ")
     print(json.dumps(output, indent=4, sort_keys=True))
     if local_rank == 0:
+        Path(args.output_file).parent.mkdir(parents=True, exist_ok=True)
         with open(args.output_file, "w") as f:
             json.dump(output, f, indent=4)
 
@@ -519,11 +520,11 @@ def main():
     args.remote_sync = args.output_file
     directory = os.path.dirname(args.output_file)
     if directory != "" and not os.path.exists(directory):
-        os.makedirs(directory)
+        os.makedirs(directory, exist_ok=True)
 
     CWD = os.getcwd()
     if args.use_temp_working_dir:
-        temp_dir = os.path.join(CWD, "eval_openlm_ckpt_temp_dirs", f"{uuid.uuid4()}")
+        temp_dir = os.path.join(CWD, "eval_openlm_ckpt_temp_dirs")
         os.makedirs(temp_dir, exist_ok=True)  # in case rank > 0
         os.chdir(temp_dir)
         print(f"Using temporary working directory: {temp_dir}")
@@ -617,6 +618,7 @@ def main():
     icl_results = evaluate(eval_model, tokenizer, eval_cfg)
     eval_metrics["icl"] = icl_results
 
+    os.chdir("..")
     dump_or_update_output(args, local_rank, eval_metrics=eval_metrics)
 
 

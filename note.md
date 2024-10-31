@@ -12,6 +12,30 @@ Run setup.py to download necessary files:
 python setup.py install
 ```
 
+Go to: http://aws.amazon.com/
+Sign Up & create a new account (they'll give you the option for 1 year trial or similar)
+Go to your AWS account overview
+Account menu in the upper-right (has your name on it)
+sub-menu: Security Credentials
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+aws configure
+
+# DCLM-refinedweb	(one local shard = 405.6 GiB), so the total is around 41.6 TiB, while the entire is 279.6 TiB
+# DCLM-baseline	6.6 TiB
+# 1: 240T tokens, 279.6 TiB (5,047,684), 340TB, 370TB after gzip compression
+# 2: 16.98T tokens (357,163)
+# 3: 100B tokens (needed for 400M-1x at 2)
+# 4: 8.2B tokens (final 400M-1x)
+# The files in each shard were shuffled before the dataset was split into shards. The documents within each file were not further shuffled - this global shuffle occurs later in our pipeline, after filtering and tokenization of the dataset. If global shuffle before tokenization across all the documents is required by your processing scheme, make sure to take this into account.
+# The documents were initially written into files as the were being read and processed from the CommonCrawl WARC files, so there was indeed no shuffling at this initial stage. After the files were created, we shuffled them (at the file level) and then split them into shards. However, because shuffling never happened at the document level at this stage, picking e.g. 300M documents at random from the entire dataset is not exactly the same as picking one shard.
+with-proxy aws s3 ls --summarize --human-readable --recursive s3://commoncrawl/contrib/datacomp/DCLM-refinedweb/global-shard_01_of_10/local-shard_0_of_10/
+```
+
 ### Ray
 
 To launch a local ray cluster, use the following command:
@@ -70,3 +94,21 @@ python ray_processing/process.py \
 ### Step3: Model-based ltering
 
 Similar to step1, but use `baselines/baselines_configs/fasttext_filter.yaml` instead.
+
+
+- "output/cc_wet_2019_april_baselines/refinedweb/refinedweb/processed_data"
+
+
+```
+import os
+
+import datasets
+
+# /data/users/zichunyu/data/hf_cache/mlfoundations___json/mlfoundations--dclm-pool-400m-1x-36757e8d7b7ffd23/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51
+datasets.load_dataset(
+    "mlfoundations/dclm-pool-400m-1x",
+    cache_dir="data",
+    num_proc=os.cpu_count() - 1,
+)
+
+```

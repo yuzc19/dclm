@@ -8,7 +8,7 @@
     "wd": 0.033,
     "cd": 3e-5,
     "global_bs": 256,
-    "acc": 1,
+    "acc": 4,
     "qk_norm": true,
     "z_loss": 1e-4,
     "grad_checkpointing": false,

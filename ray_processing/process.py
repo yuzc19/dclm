@@ -142,7 +142,11 @@ if __name__ == "__main__":
     if args.ray_use_working_dir:
         ray.init(address=args.ray_address, runtime_env={"working_dir": "./", "excludes": ["tests/"]})
     else:
-        ray.init(address=args.ray_address)
+        ray.init(
+            runtime_env={"env_vars": {k: v for k, v in os.environ.items() if k.startswith("AWS")}},
+            _temp_dir="/data/users/zichunyu/tmp/ray",
+            dashboard_host="127.0.0.1",
+        )
 
     config_path = args.config_path
     output_dir = args.output_dir
@@ -207,6 +211,8 @@ if __name__ == "__main__":
 
         # Retrieve the list of files before processing a chunk (in case of deletions)
         shard_files = list_shard_files(working_dir, args.num_shards, args.shard_list_file)
+        # shard_files = shard_files[:1]
+        # shard_files = ["CC_shard_00000000_processed.jsonl.zst"]
         shard_extension = os.path.splitext(shard_files[0])[-1][1:]
         print(f"Starting chunk {i} with name {step_name}, # of input jsonls = {len(shard_files)}")
 

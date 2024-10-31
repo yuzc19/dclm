@@ -285,7 +285,8 @@ def get_open_lm_args(args, hparams, dr):
         f"{hparams.acc}",
         "--model-norm",
         hparams.norm,
-        "--delete-previous-checkpoint",
+        # delete previous ones?
+        # "--delete-previous-checkpoint",
         "--lr-cooldown-end",
         f"{hparams.cd}",
         "--logs",
@@ -315,13 +316,14 @@ def get_open_lm_args(args, hparams, dr):
     if args.re_evaluate is None:
         # case where we are training
         name = hparams.get_friendly_name(dr, args.name_suffix)
-
         open_lm_args.extend(
             [
                 "--train-num-samples",
                 f"{hparams.tokens // args.num_checkpoints}",
                 "--dataset-manifest",
-                dr.manifest_url,
+                # dr.manifest_url,
+                dr.manifest_url.split()[0],
+                dr.manifest_url.split()[1],
                 "--data-key",
                 dr.data_key,
                 "--name",
@@ -347,20 +349,20 @@ def get_open_lm_args(args, hparams, dr):
 
     if args.do_eval:
         openlm_val_data = download_val_data("open_lm_val", skip_download=local_rank != 0)
-        c4_val_data = download_val_data("c4_val", skip_download=local_rank != 0)
-        paloma_val_data = download_val_data("paloma_val", skip_download=local_rank != 0)
+        # c4_val_data = download_val_data("c4_val", skip_download=local_rank != 0)
+        # paloma_val_data = download_val_data("paloma_val", skip_download=local_rank != 0)
 
     if not args.do_eval:
         pass
     elif args.downstream_eval:
-        tasks = load_ppl_yaml()
+        tasks = load_ppl_yaml("light")
         downstream_datas = [download_val_data(task_name, skip_download=local_rank != 0) for task_name in tasks]
 
         open_lm_args.extend(
             [
                 "--val-data",
                 openlm_val_data,
-                c4_val_data,
+                # c4_val_data,
                 # paloma_val_data,
                 *downstream_datas,
                 "--val-frequency",

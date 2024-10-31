@@ -1,0 +1,21 @@
+{
+    "uuid": "95a9be54-f57d-4fd3-a5d7-bb693f4a94ba",
+    "name": "10000-data_influence_model-flan_2-tc-merge",
+    "creation_date": "2024_08_22-01_15_06",
+    "dataset_url": "/mnt/mffuse/scaling_mates/dclm/output/10000-data_influence_model-flan_tokenized_2",
+    "manifest_url": "/mnt/mffuse/scaling_mates/dclm/output/10000-data_influence_model-flan_tokenized_2/manifest.jsonl /mnt/mffuse/scaling_mates/dclm/output/baseline_01_1_fasttext_tokenized/manifest.jsonl",
+    "sources": [
+        {
+            "uuid": "f12dc026-cc4a-4203-ba9f-9ba08c5945f9",
+            "name": "10000-data_influence_model-flan_2-tc-merge"
+        }
+    ],
+    "tokenized": true,
+    "tokenizer": "tokenization_configs/pythia-410m",
+    "num_tokens": 0,
+    "size": 101084072,
+    "dcnlp_commit_hash": null,
+    "dcnlp_diff": "",
+    "data_key": "json.gz",
+    "sampling_yaml": null
+}

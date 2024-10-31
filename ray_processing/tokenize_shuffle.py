@@ -102,9 +102,11 @@ def main(args, dcnlp_arg_names):
     dataset_json = generate_tokenized_dataset_json(args, source_refs)
     with open(json_path, "w") as ref_file:
         json.dump(dataset_json, ref_file, indent=4)
-    out_json_path = f"{args.output}/{pathlib.Path(args.output).name}.json"
-    print(f"moving dataset json to {out_json_path}")
-    os.system(f"aws s3 cp {json_path} {out_json_path}")
+    # out_json_path = f"{args.output}/{pathlib.Path(args.output).name}.json"
+    # os.system(f"aws s3 cp {json_path} {out_json_path}")
+    out_json_path = f"{args.output.rstrip('/')}/{pathlib.Path(args.output).name}.json"
+    os.makedirs(os.path.dirname(out_json_path), exist_ok=True)
+    os.system(f"cp {json_path} {out_json_path}")
 
 
 if __name__ == "__main__":

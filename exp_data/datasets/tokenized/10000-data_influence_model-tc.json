@@ -1,13 +1,13 @@
 {
     "uuid": "95a9be54-f57d-4fd3-a5d7-bb693f4a94ba",
-    "name": "baseline_01_01_fasttext",
+    "name": "10000-data_influence_model_2-tc-merge",
     "creation_date": "2024_08_22-01_15_06",
-    "dataset_url": "/mnt/mffuse/scaling_mates/dclm/output/baseline_01_0_tokenized_fasttext",
-    "manifest_url": "/mnt/mffuse/scaling_mates/dclm/output/baseline_01_0_tokenized_fasttext/manifest.jsonl /mnt/mffuse/scaling_mates/dclm/output/baseline_01_1_tokenized_fasttext/manifest.jsonl",
+    "dataset_url": "/mnt/mffuse/scaling_mates/dclm/output/10000-data_influence_model_tokenized_2",
+    "manifest_url": "/mnt/mffuse/scaling_mates/dclm/output/10000-data_influence_model_tokenized_2/manifest.jsonl /mnt/mffuse/scaling_mates/dclm/output/baseline_01_1_fasttext_tokenized/manifest.jsonl",
     "sources": [
         {
             "uuid": "f12dc026-cc4a-4203-ba9f-9ba08c5945f9",
-            "name": "baseline_01_01_fasttext"
+            "name": "10000-data_influence_model_2-tc-merge"
         }
     ],
     "tokenized": true,
