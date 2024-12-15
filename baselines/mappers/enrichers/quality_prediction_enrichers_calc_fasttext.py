@@ -16,7 +16,7 @@ from core.factory_utils import factory_function
 PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..")
 )
-MODEL_SUBDIRECTORY = "../tmp/quality_prediction_enrichment_models"
+MODEL_SUBDIRECTORY = "/data/user_data/zichunyu/dclm/baselines/mappers/enrichers/quality_prediction_enrichment_models"
 RPJ_MODEL_FILENAME = "model.bin"
 
 

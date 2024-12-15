@@ -9,6 +9,7 @@ Important package version:
 Run setup.py to download necessary files:
 
 ```bash
+XDG_CACHE_HOME=<path> pip ...
 python setup.py install
 ```
 
