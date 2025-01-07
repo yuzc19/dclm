@@ -25,7 +25,7 @@ method="baseline_01_0_fasttext_10000-data_influence_model-flan-d=1024_l=24_h=8-w
 PYTHONUNBUFFERED=1 NCCL_P2P_DISABLE=1 torchrun --nproc_per_node 8 --master_port 47762 eval/eval_openlm_ckpt.py \
     --donot-compute-perplexity \
     --checkpoint /data/datasets/hf_cache/dclm_logs/$method/checkpoints/epoch_1.pt \
-    --model open_lm_411m_v2.json \
+    --model ../training/open_lm_configs/d=1024_l=24_h=8.json \
     --config /data/datasets/hf_cache/dclm_logs/$method/params.txt \
     --eval-yaml eval/mmlu_and_lowvar.yaml \
     --output-file results/$method/epoch_1/metrics_mmlu_and_lowvar.json \

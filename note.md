@@ -1,4 +1,4 @@
-### Environment
+## Prerequisites
 
 Important package version:
 
@@ -37,6 +37,54 @@ aws configure
 with-proxy aws s3 ls --summarize --human-readable --recursive s3://commoncrawl/contrib/datacomp/DCLM-refinedweb/global-shard_01_of_10/local-shard_0_of_10/
 ```
 
+## Pipeline
+
+Please change the file location based on your system.
+
+### Step1: Get the required data
+
+We start from the DCLM-refinedweb pool and process the data with DCLM-fastText ourselves (two hard-coded paths are in `ray_processing/process.py` and `baselines/mappers/enrichers/quality_prediction_enrichers_calc_fasttext.py`).
+
+See `scripts/fasttext_sbatch.sh`:
+
+- `source_ref_paths`: one data split on AWS ("dataset_url": "s3://commoncrawl/contrib/datacomp/DCLM-refinedweb/global-shard_01_of_10/local-shard_0_of_10"), we can simply use global-shard_01_of_10/local-shard_x_of_10 for more splits
+- `output_dir`: processed text data dir
+
+One processed split will have ~36B tokens, so if the scale requires 138B tokens (e.g., 7B-1x), we need at least 8 splits to be processed since our later selection ratio will be ~0.5.
+
+### Step1.5: Selection
+
+Will update it after I tune the hyperparameters.
+
+### Step2: Tokenization
+
+Please install rust in your conda environment.
+
+See `rust_processing/tokshuf-rs/rust_tokenize.sh`:
+
+- `input`: the original text data dir (from previous steps)
+- `output`: the tokenized data dir
+
+### Step3: Pretraining
+
+See `scripts/pretrain_sbatch.sh`:
+
+- `scale`: DCLM running scale, please find the supported ones in `training/configs`
+- `data-config`: specify the run name ("name") and the tokenized data location ("manifest_url"), create one when you have a new dataset
+- `logs`: where to store the checkpoint
+- `multiple-data-passes`: used to allow multiple epochs
+
+### Step4: Evaluation
+
+See `scripts/eval_sbatch.sh`:
+
+- `method`: the generated checkpoint dir name
+- `checkpoint`: the specific epoch you want to evaluate
+- `model`: model scale config in `training/open_lm_configs`
+- `output-file`: where to store the evaluation result
+
+## Preprocessing Notes (Ignored)
+
 ### Ray
 
 To launch a local ray cluster, use the following command:
@@ -55,17 +103,17 @@ Create `exp_data/datasets/raw_sources/test.json`:
 
 ```json
 {
-    "uuid": "f12dc026-cc4a-4203-ba9f-9ba08c5945f9",
-    "name": "CC_shard_00000000",
-    "dataset_url": "data/downloads/",
-    "manifest_url": null,
-    "sources": [],
-    "tokenized": false,
-    "tokenizer": null,
-    "num_tokens": null,
-    "dcnlp_commit_hash": null,
-    "dcnlp_diff": null,
-    "data_key": "jsonl.zst"
+  "uuid": "f12dc026-cc4a-4203-ba9f-9ba08c5945f9",
+  "name": "CC_shard_00000000",
+  "dataset_url": "data/downloads/",
+  "manifest_url": null,
+  "sources": [],
+  "tokenized": false,
+  "tokenizer": null,
+  "num_tokens": null,
+  "dcnlp_commit_hash": null,
+  "dcnlp_diff": null,
+  "data_key": "jsonl.zst"
 }
 ```
 
@@ -96,9 +144,7 @@ python ray_processing/process.py \
 
 Similar to step1, but use `baselines/baselines_configs/fasttext_filter.yaml` instead.
 
-
 - "output/cc_wet_2019_april_baselines/refinedweb/refinedweb/processed_data"
-
 
 ```
 import os

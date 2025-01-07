@@ -21,7 +21,7 @@ ray start --head --port=6379 --temp-dir=$SPILL_LOCATION
 
 TMPDIR=/scratch/$(whoami)/tmp PYTHONPATH=$(pwd) python ray_processing/process.py \
     --source_ref_paths exp_data/datasets/raw_sources/refinedweb_01_0.json \
-    --readable_name fasttext_new_01_0 \
+    --readable_name fasttext_01_0 \
     --output_dir $BASE_DIR/refinedweb_01_0/fasttext \
     --config_path baselines/baselines_configs/fasttext_filter.yaml \
     --source_name cc \
