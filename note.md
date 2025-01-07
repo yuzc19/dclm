@@ -50,7 +50,7 @@ See `scripts/fasttext_sbatch.sh`:
 - `source_ref_paths`: one data split on AWS ("dataset_url": "s3://commoncrawl/contrib/datacomp/DCLM-refinedweb/global-shard_01_of_10/local-shard_0_of_10"), we can simply use global-shard_01_of_10/local-shard_x_of_10 for more splits
 - `output_dir`: processed text data dir
 
-One processed split will have ~36B tokens, so if the scale requires 138B tokens (e.g., 7B-1x), we need at least 8 splits to be processed since our later selection ratio will be ~0.5.
+One processed split will have ~36B tokens (60GB - 70GB in size), so if the scale requires 138B tokens (e.g., 7B-1x), we need at least 8 splits to be processed since our later selection ratio will be ~0.5.
 
 ### Step1.5: Selection
 
