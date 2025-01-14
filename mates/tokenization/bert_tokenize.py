@@ -38,7 +38,7 @@ if __name__ == "__main__":
         padding="max_length",
     )
 
-    for file in tqdm(file_list[600:]):
+    for file in tqdm(file_list):
         if os.path.isdir(file):
             print(file)
             continue

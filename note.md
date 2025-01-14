@@ -54,7 +54,47 @@ One processed split will have ~36B tokens (60GB - 70GB in size), so if the scale
 
 ### Step1.5: Selection
 
-Will update it after I tune the hyperparameters.
+#### FineWeb-Edu classifier
+
+Run `mates/tokenization/bert_tokenize.py`:
+
+- Modify `data_dir` to your processed text data dir (one split)
+- Modify `output_dir` to your bert tokenized data dir
+
+You can split the data into multiple shards to speed up the tokenization by:
+
+```bash
+index=0
+for s in {0..7}; do
+    echo $s
+    nohup python mates/tokenization/bert_tokenize.py --shard $s 8 > log_job_s${s}.out 2>&1 &
+    ((index=(index+1)%8))
+done
+```
+
+Run `mates/modeling/predict_fineweb_edu.py`:
+
+- Modify `data_dir` to your bert tokenized data dir
+- Modify `output_dir` to your prediction dir
+
+You can split the data into multiple shards to speed up the prediction by:
+
+```bash
+index=0
+for s in {0..7}; do
+    echo $s
+    CUDA_VISIBLE_DEVICES=$index nohup python mates/modeling/predict_fineweb_edu.py --shard $s 8 > log_job_s${s}.out 2>&1 &
+    ((index=(index+1)%8))
+done
+```
+
+Run `mates/tokenization/select_data.py`:
+
+- Modify `args.output_dir` to your prediction dir
+- Modify `data_dir` to your bert tokenized data dir
+- Modify `file_dir` to your processed text data dir
+
+The final selected data will be in the `{args.output_dir}/processed_data`.
 
 ### Step2: Tokenization
 
