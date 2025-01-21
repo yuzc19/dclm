@@ -1,11 +1,5 @@
 ## Prerequisites
 
-Important package version:
-
-- nltk==3.8.1
-- boto3==1.26.145
-- moto==5.0.11
-
 Run setup.py to download necessary files:
 
 ```bash
@@ -91,6 +85,53 @@ done
 Run `mates/tokenization/select_data.py`:
 
 - Modify `args.output_dir` to your prediction dir
+- Modify `data_dir` to your bert tokenized data dir
+- Modify `file_dir` to your processed text data dir
+
+The final selected data will be in the `{args.output_dir}/processed_data`.
+
+#### Influence with clustering
+
+Run `mates/modeling/predict_data_influence.py`:
+
+- Modify `data_dir` to your bert tokenized data dir
+- Modify `model_dir` to your data influence model dir
+- Modify `output_dir` to your prediction dir
+
+You can split the data into multiple shards to speed up the prediction by:
+
+```bash
+index=0
+for s in {0..7}; do
+    echo $s
+    CUDA_VISIBLE_DEVICES=$index nohup python mates/modeling/predict_data_influence.py --shard $s 8 > log_job_s${s}.out 2>&1 &
+    ((index=(index+1)%8))
+done
+```
+
+---
+
+**Important**: Create a new Python 3.9 environment and install all the packages in `semdedup/requirements.txt`. Modify all the prefix dirs in `semdedup/clustering/configs/openclip/dclm_dim.yaml` to your prediction dir.
+
+Run:
+
+```bash
+cd semdedup/clustering
+export PYTHONPATH=$(pwd)
+cd ..
+python clustering.py
+python select_indices.py
+```
+
+The selected indices will be in your prediction dir.
+
+---
+
+Return to the dclm environment.
+
+Run `mates/tokenization/select_data_with_indices.py`:
+
+- Modify `args.output_dir` to your prediction dir (it will find the selected indices automatically)
 - Modify `data_dir` to your bert tokenized data dir
 - Modify `file_dir` to your processed text data dir
 

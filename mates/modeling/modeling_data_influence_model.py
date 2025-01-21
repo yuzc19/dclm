@@ -107,9 +107,8 @@ class BertForSequenceClassification(BertPreTrainedModel):
             return ((loss,) + output) if loss is not None else output
 
         return SequenceClassifierOutput(
-                loss=loss,
-                logits=logits,
-                hidden_states=outputs.hidden_states,
-                attentions=outputs.attentions,
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
         )
-        # pooled_output,
