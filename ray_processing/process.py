@@ -144,8 +144,7 @@ if __name__ == "__main__":
     else:
         ray.init(
             runtime_env={"env_vars": {k: v for k, v in os.environ.items() if k.startswith("AWS")}},
-            _temp_dir="/data/users/zichunyu/tmp/ray",
-            dashboard_host="127.0.0.1",
+            _temp_dir="/home/zichunyu/tmp/ray",
         )
 
     config_path = args.config_path

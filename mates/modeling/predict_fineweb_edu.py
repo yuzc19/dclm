@@ -14,7 +14,6 @@ class ModelAnnotator:
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name,
             torch_dtype=torch.bfloat16,
-            cache_dir="/data/datasets/hf_cache",
         )
         self.model.eval()
 
@@ -56,7 +55,7 @@ class ModelAnnotator:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_dir", type=str, default="/data/datasets/hf_cache")
+    parser.add_argument("--base_dir", type=str, default="/home/zichunyu")
     parser.add_argument("--base", type=int, default=0)
     parser.add_argument("-S", "--shard", type=int, nargs=2, default=[0, 1])
     parser.add_argument("--map_batch_size", type=int, default=1024)
@@ -65,7 +64,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    data_dir = f"{args.base_dir}/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
+    data_dir = f"{args.base_dir}/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
     output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/fineweb-edu-prediction"
 
     file_list = [

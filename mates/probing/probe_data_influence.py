@@ -88,7 +88,7 @@ if __name__ == "__main__":
         os.makedirs(os.path.join(args.logs, name), exist_ok=True)
 
     if not args.skip_train:
-        from .probe_train import main
+        from .probe_pairwise_train import main
 
         print(f"Running with args:\n{open_lm_args}")
 
