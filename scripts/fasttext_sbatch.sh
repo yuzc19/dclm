@@ -11,6 +11,7 @@
 #SBATCH --exclude=babel-5-15,babel-5-23
 #SBATCH --time=2-00:00:00
 
+# srun --gres=gpu:8 --mem=512G --time 2-00:00:00 -c 128 --job-name "interactive" --pty bash
 # srun --partition=general --gres=gpu:0 --mem=512G --time 2-00:00:00 -c 64 --job-name "interactive" --pty bash
 # ssh -J zichunyu@babel.lti.cs.cmu.edu babel-2-25
 # scp -r -J zichunyu@babel.lti.cs.cmu.edu babel-2-25:/data/datasets/hf_cache/baseline_01_0_fasttext_tokenized.tar.gz .

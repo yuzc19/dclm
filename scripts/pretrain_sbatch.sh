@@ -14,33 +14,15 @@
 # print commands
 set -x
 
-export WANDB_DIR="/scratch/zichunyu/tmp"
+export WANDB_DIR="/home/zichunyu/tmp"
 mkdir -p $WANDB_DIR
 
 torchrun --nproc-per-node 8 -m training.train -- \
-  --scale 411m_4x \
-  --data-config exp_data/datasets/tokenized/baseline_01_0_fasttext_10000-data_influence_model-flan.json \
-  --logs /data/datasets/hf_cache/dclm_logs \
+  --scale 1b_1x_fast \
+  --data-config exp_data/datasets/tokenized/baseline_01_1_fasttext.json \
+  --logs /home/zichunyu/out/dclm_logs \
   --multiple-data-passes \
   --report-to-wandb
-
-# torchrun --nproc-per-node 8 -m training.train -- \
-#   --scale 411m_1x \
-#   --data-config exp_data/datasets/tokenized/baseline_toy.json \
-#   --logs /data/datasets/hf_cache/dclm_logs \
-#   --report-to-wandb
-
-# torchrun --nproc-per-node 8 -m training.train -- \
-#   --scale 411m_4x \
-#   --data-config exp_data/datasets/tokenized/baseline_01_01_fasttext.json \
-#   --logs /data/datasets/hf_cache/dclm_logs \
-#   --report-to-wandb
-
-# python -m training.train \
-#   --scale 1b_1x_fast \
-#   --data-config exp_data/datasets/tokenized/10000-data_influence_model.json \
-#   --logs logs \
-#   --report-to-wandb
 
 # DATA_DIR=$1
 # DATASET_NAME=$2
