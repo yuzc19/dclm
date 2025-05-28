@@ -1,4 +1,5 @@
 import torch
+import random
 from tqdm import tqdm
 from datasets import Dataset
 from litdata import optimize
@@ -8,7 +9,8 @@ from torch.utils.data import DataLoader
 from file_utils import list_dir, read_jsonl
 from litdata.streaming import StreamingDataset, TokensLoader
 
-data_dir = "data/refinedweb_01_0/fasttext/fasttext_filter/processed_data"
+# data_dir = "/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data"
+data_dir = "/home/zichunyu/out/refinedweb_01_0/fasttext/fasttext_filter/fineweb-edu-prediction/processed_data"
 file_list = list_dir(data_dir)
 
 dataset = []
@@ -19,7 +21,7 @@ for file in tqdm(file_list):
 dataset = Dataset.from_list([{"text": d} for d in dataset])
 print("Total examples:", len(dataset))
 
-tokenizer = Tokenizer("checkpoints/EleutherAI/pythia-1b")
+tokenizer = Tokenizer("tokenization_configs/pythia-410m")
 
 
 def tokenize(data: Dataset, index: int):

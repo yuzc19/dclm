@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-confg_file = "clustering/configs/openclip/dclm_dim_411m.yaml"
+confg_file = "clustering/configs/openclip/dclm_dim_rollout.yaml"
 ## -- Load kmeans clustering parameters from configs file
 with open(confg_file, "r") as y_file:
     params = yaml.load(y_file, Loader=yaml.FullLoader)

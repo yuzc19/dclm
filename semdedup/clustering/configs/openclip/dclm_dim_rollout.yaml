@@ -1,0 +1,15 @@
+sim_metric: "cosine" # choose form ['cosine', 'l2']
+keep_hard: True # True for hard examples
+Kmeans_with_cos_dist: True # True for using cosine similarity for kmeans clustering
+emb_memory_loc: "/project/flame/zichunyu/out/oracle/pythia-410m/epoch_2/rollout-dim-flan-r10-bs1-prediction-0/emb.npy"
+text_emb_memory_loc: None
+paths_memory_loc: "/project/flame/zichunyu/out/oracle/pythia-410m/epoch_2/rollout-dim-flan-r10-bs1-prediction-0/paths.npy"
+sorted_clusters_file_loc: "/project/flame/zichunyu/out/oracle/pythia-410m/epoch_2/rollout-dim-flan-r10-bs1-prediction-0/sorted_clusters"
+save_folder: "/project/flame/zichunyu/out/oracle/pythia-410m/epoch_2/rollout-dim-flan-r10-bs1-prediction-0/cluster_info"
+path_str_type: "S24"
+ncentroids: 10000
+dataset_size: 29478616
+emb_size: 768
+niter: 100
+seed: 1234
+selection_ratio: 0.5
