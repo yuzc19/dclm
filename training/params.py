@@ -287,6 +287,10 @@ def get_open_lm_args(args, hparams, dr):
         hparams.norm,
         # delete previous ones?
         # "--delete-previous-checkpoint",
+        "--lr-scheduler",
+        "const-cooldown",
+        # "--epochs-cooldown",
+        # "1",
         "--lr-cooldown-end",
         f"{hparams.cd}",
         "--logs",
@@ -430,7 +434,7 @@ def get_open_lm_args(args, hparams, dr):
         )
 
     if args.report_to_wandb:
-        open_lm_args.extend(["--report-to", "wandb", "--wandb-project-name", "dcnlp"])
+        open_lm_args.extend(["--report-to", "wandb", "--wandb-project-name", "data-limited-pretraining"])
 
     if hparams.qk_norm:
         open_lm_args.append("--qk-norm")
@@ -438,6 +442,8 @@ def get_open_lm_args(args, hparams, dr):
         open_lm_args.append("--grad-checkpointing")
     if hparams.z_loss > 0:
         open_lm_args.extend(["--z-loss", f"{hparams.z_loss}"])
+    if hparams.steps_cooldown is not None:
+        open_lm_args.extend(["--steps-cooldown", f"{hparams.steps_cooldown}"])
     if args.remote_sync:
         open_lm_args.extend(
             [

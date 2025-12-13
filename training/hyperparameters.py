@@ -29,6 +29,7 @@ class Hyperparameters:
     seed: int = 124
     vocab_size: int = 50432
     norm: str = "gain_only_lp_layer_norm"
+    steps_cooldown: int = 0
 
     def update_config(self, args):
         if args.warmup is not None:
