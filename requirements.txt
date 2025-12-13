@@ -136,7 +136,7 @@ jupyterlab==4.2.5
 jupyterlab_pygments==0.3.0
 jupyterlab_server==2.27.3
 jusText==3.0.1
-kenlm @ https://github.com/kpu/kenlm/archive/master.zip#sha256=d23d300d559a45a5e3ede958dbbf2395231119c0b8cd97a1ea43480625894ff4
+kenlm @ https://github.com/kpu/kenlm/archive/master.zip
 kiwisolver==1.4.5
 langdetect==1.0.9
 lazy_loader==0.4
