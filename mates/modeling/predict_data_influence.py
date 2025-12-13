@@ -3,7 +3,7 @@ import os
 
 import datasets
 import torch
-from datasets import Dataset
+from transformers import AutoModel
 from modeling_data_influence_model import BertForSequenceClassification
 
 
@@ -20,9 +20,13 @@ class ModelAnnotator:
         )
         self.model.eval()
 
+        self.bge = AutoModel.from_pretrained("BAAI/bge-base-en-v1.5")
+        self.bge.eval()
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device {self.device}")
         self.model.to(self.device)
+        self.bge.to(self.device)
 
     def __getstate__(self):
         return {
@@ -37,21 +41,34 @@ class ModelAnnotator:
     def __call__(self, example, indices):
         output = {"index": indices}
 
-        outputs, pooled_output = self.model(
+        outputs = self.model(
             torch.tensor(example["input_ids"], device=self.device),
             attention_mask=torch.tensor(example["attention_mask"], device=self.device),
             token_type_ids=torch.tensor(example["token_type_ids"], device=self.device),
             output_hidden_states=True,
         )
-        output["reps"] = pooled_output.detach().float().cpu().numpy()
         output["prediction"] = outputs.logits.detach().float().cpu().numpy()
+
+        # for key, value in example.items():
+        #     bs = len(value)
+        #     example[key] = torch.tensor(value, device=self.device).reshape(bs * 4, -1)
+        # outputs = self.bge(
+        #     example["input_ids"],
+        #     attention_mask=example["attention_mask"],
+        #     token_type_ids=example["token_type_ids"],
+        #     return_dict=True,
+        # )
+        # p_reps = outputs.last_hidden_state[:, 0]
+        # p_reps = torch.nn.functional.normalize(p_reps, dim=-1).contiguous()
+        # p_reps = p_reps.reshape(-1, 4, p_reps.size(1)).mean(dim=1)
+        # output["reps"] = p_reps.detach().float().cpu().numpy()
 
         return output
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_dir", type=str, default="/data/datasets/hf_cache")
+    parser.add_argument("--base_dir", type=str, default="/home/zichunyu")
     parser.add_argument("--model_name", type=str, default="pythia-1b")
     parser.add_argument("--ckpt", type=int, default=10000)
     parser.add_argument("--base", type=int, default=0)
@@ -62,21 +79,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    data_dir = f"{args.base_dir}/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
-    # model_dir = f"{args.base_dir}/out/pythia-1b/fineweb/sample-350BT/10000-data_influence_model-flan"
-    model_dir = f"{args.base_dir}/out/data_influence_model/pythia-1b/10000"
-    # output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/10000-data_influence_model-flan-prediction"
-    output_dir = f"{args.base_dir}/out/data_influence_model/pythia-1b/10000-prediction"
+    data_dir = f"{args.base_dir}/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
+    # model_dir = f"{args.base_dir}/out/1b-data_influence_model"
+    output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/1b-data_influence_model-prediction"
 
     file_list = [
         os.path.abspath(os.path.join(data_dir, f))
         for f in os.listdir(data_dir)
         if not f.startswith(".")
     ]
-    file_list = file_list[:300]
     shard_names = [file.split("/")[-1].split("_bert")[0] for file in file_list]
-    # f = open("tmp-1.txt","w")
-    # f.write(str(shard_names))
     shard_size = len(file_list) // args.shard[1]
     print(
         args.shard[0] * shard_size,
