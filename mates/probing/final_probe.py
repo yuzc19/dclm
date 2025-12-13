@@ -1,12 +1,16 @@
 import os
 import time
 import math
+import copy
+import wandb
 import torch
+import fsspec
 import random
 import functools
 import numpy as np
 from tqdm import tqdm
 from torch import optim
+from contextlib import nullcontext
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from open_lm.params import parse_args
@@ -14,8 +18,7 @@ from open_lm.precision import get_autocast
 from open_lm.model import create_model, Block
 from open_lm.file_utils import pt_load, check_exists
 from open_lm.losses import CrossEntropyLossWithZLoss
-from datasets import Dataset, Features, Sequence, Value
-from open_lm.distributed import is_master, init_distributed_device
+from open_lm.distributed import init_distributed_device
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
@@ -59,23 +62,30 @@ def load_optimizer(args, model, optimizer):
     return osd
 
 
-def train(model, optimizer, train_data):
+def train(model, optimizer, train_data, accumulation=False, acc_steps=1):
     optimizer.zero_grad()
     loss = CrossEntropyLossWithZLoss()
     autocast = get_autocast("amp_bfloat16")
-    with autocast():
-        inputs, targets = (
-            train_data[:, :-1].contiguous().long().cuda(),
-            train_data[:, 1:].contiguous().long().cuda(),
-        )
-        out, _, _ = model(inputs)
-        total_loss = loss(out.reshape(-1, model.vocab_size), targets.reshape(-1))
-    total_loss.backward()
-    if isinstance(model, FSDP):
-        model.clip_grad_norm_(1, norm_type=2.0)
-    else:
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1, norm_type=2.0)
-    optimizer.step()
+    maybe_no_sync = nullcontext
+    # Don't sync gradients until the final batch for FSDP.
+    if isinstance(model, FSDP) and accumulation:
+        maybe_no_sync = model.no_sync
+    with maybe_no_sync():
+        with autocast():
+            inputs, targets = (
+                train_data[:, :-1].contiguous().long().cuda(),
+                train_data[:, 1:].contiguous().long().cuda(),
+            )
+            out, _, _ = model(inputs)
+            total_loss = loss(out.reshape(-1, model.vocab_size), targets.reshape(-1)) / acc_steps
+        total_loss.backward()
+    if not accumulation:
+        if isinstance(model, FSDP):
+            model.clip_grad_norm_(1, norm_type=2.0)
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1, norm_type=2.0)
+        optimizer.step()
+    return total_loss.item()
 
 
 @torch.no_grad()
@@ -101,10 +111,7 @@ def evaluate(model, val_dataloader):
 
 def main(args):
     args = parse_args(args)
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_01_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_1.pt"
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_0_fasttext_10000-data_influence_model-flan-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_6.pt"
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_1_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_2.pt"
-    args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_1_fasttext-open_lm_1b_swiglutorch-warm=5000-lr=0p003-wd=0p033-cd=3e-05-bs=256-mult=1-seed=124-tokens=28795904000/checkpoints/epoch_1.pt"
+    args.resume = "/project/flame/zichunyu/out/dclm_logs/baseline_01_0_fasttext_10000-data_influence_model-flan-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_5.pt"
 
     if torch.cuda.is_available():
         # This enables tf32 on Ampere GPUs which is only 8% slower than
@@ -116,9 +123,7 @@ def main(args):
 
     device = init_distributed_device(args)
     random_seed(args.seed, 0)
-    with torch.device(
-        "meta" if args.experimental_meta_device and args.fsdp else args.device
-    ):
+    with torch.device(args.device):
         model = create_model(args)
 
     random_seed(args.seed, args.rank)
@@ -194,6 +199,8 @@ def main(args):
                 model, device_ids=[device], **ddp_args
             )
 
+    if args.rank == 8:
+        wandb.init(project="dcnlp", name="scale=400m_4x-step=30k-decay_data=oracle")
     sd = load_model(args, model)
     model.load_state_dict(sd)
 
@@ -212,9 +219,10 @@ def main(args):
     )
     osd = load_optimizer(args, model, optimizer)
 
-    probe_data = "/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/train.pt"
-    # probe_data = "/home/zichunyu/out/refinedweb_01_0/fasttext/fasttext_filter/fineweb-edu-prediction/processed_data/pythia_tokenized/train.pt"
-    train_dataset = torch.load(probe_data)
+    probe_data = "/project/flame/zichunyu/data/shard_0-49_hq.pt"
+    of = fsspec.open(probe_data, "rb")
+    with of as f:
+        train_dataset = torch.load(f)
     dataset_len = len(train_dataset)
     print(dataset_len)
 
@@ -230,79 +238,77 @@ def main(args):
 
         return {"input_ids": x, "labels": y}
 
-    val_dataloader = DataLoader(
-        # torch.load("/home/zichunyu/data/lambada_openai/train-1024.pt"),
-        torch.load("/home/zichunyu/data/tulu/train-1024.pt")[:128],
-        # torch.load("/home/zichunyu/data/oh/train.pt")[:64]
-        # + torch.load("/home/zichunyu/data/eli5/train.pt")[:64],
-        batch_size=64,
-        collate_fn=val_collate_fn,
-    )
-
-    # def get_wsd_lr(learning_rate, it) -> float:
-    #     if it < 10:
-    #         return learning_rate * it / 10
-    #     if it < 50:
-    #         return learning_rate
-    #     return learning_rate * math.pow(0.5, (it - 50) / (50))
-
-    seed = int(os.environ.get("SEED"))
-    print("SEED:", seed)
-    np.random.seed(seed)
-    left, right = seed * 10000, seed * 10000 + 10000
-    ocache = f"{args.resume[:-3]}/oracle/{seed}"
-    oracle = []
-
-    # model.load_state_dict(sd)
-    # optimizer.load_state_dict(osd)
-    # init_lr = optimizer.param_groups[0]["lr"]
-    # print("init_lr: ", init_lr)
-    # for i in tqdm(range(50)):
-    #     lr = get_wsd_lr(init_lr, i)
-    #     for param_group in optimizer.param_groups:
-    #         param_group["lr"] = lr
-    #     train(model, optimizer, train_dataset[i])
-    #     if i == 49:
-    #         torch.save(
-    #             model.state_dict(),
-    #             f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/model-50-{args.rank}.pt",
-    #         )
-    #         torch.save(
-    #             optimizer.state_dict(),
-    #             f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/optimizer-50-{args.rank}.pt",
-    #         )
-    # sd = torch.load(f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/model-50-{args.rank}.pt")
-    # osd = torch.load(f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/optimizer-50-{args.rank}.pt")
-    # exit(0)
-
-    eval_base = evaluate(model, val_dataloader)[0]
-    for i in tqdm(range(left, right)):
-        model.load_state_dict(sd)
-        optimizer.load_state_dict(osd)
-        train_index, probe_index = np.random.permutation(dataset_len)[:2]
-        train_index = i
-        train_data = train_dataset[train_index]
-        probe_data = train_dataset[probe_index]
-        scores = []
-        train(model, optimizer, train_data)
-        scores.append(evaluate(model, val_dataloader)[0] - eval_base)
-        train(model, optimizer, probe_data)
-        scores.append(evaluate(model, val_dataloader)[0] - eval_base)
-
-        oracle.append(
-            {
-                "input_ids": train_data[0][:-1].cpu().numpy().tolist()
-                + probe_data[0][:-1].cpu().numpy().tolist(),
-                "scores": scores,
-            }
+    val_data = "gs://cmu-gpucloud-zichunyu/data/tulu/train-1024.pt"
+    of = fsspec.open(val_data, "rb")
+    with of as f:
+        val_dataloader = DataLoader(
+            torch.load(f)[:128],
+            batch_size=64,
+            collate_fn=val_collate_fn,
         )
-        if (i + 1) % 1000 == 0 or (i + 1) == right:
-            if args.rank == 0:
-                features = Features(
-                    {
-                        "input_ids": Sequence(Value("int32")),
-                        "scores": Sequence(Value("float32")),
-                    }
+
+    model.load_state_dict(sd)
+    optimizer.load_state_dict(osd)
+    init_lr = optimizer.param_groups[0]["lr"]
+    print("init_lr: ", init_lr)
+
+    def get_wsd_lr(learning_rate, it) -> float:
+        if it < 30:
+            return learning_rate * it / 30
+        if it < 100:
+            return learning_rate
+        return learning_rate * math.pow(0.5, (it - 50) / (50))
+
+    model.train()
+    base = 0
+    for i in tqdm(range(200)):
+        lr = get_wsd_lr(3e-4, i)
+        print(f"Step {i}, learning rate: {lr:.6f}")
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = lr
+
+        model_state_copy = copy.deepcopy(model.state_dict())
+        optimizer_state_copy = copy.deepcopy(optimizer.state_dict())
+
+        train_data = torch.cat(train_dataset[i * 5 + base : (i + 1) * 5 + base])
+
+        # scores = []
+        # for j in range(5):
+        #     model.load_state_dict(model_state_copy)
+        #     optimizer.load_state_dict(optimizer_state_copy)
+
+        #     train(model, optimizer, train_data[j : j + 1])
+        #     scores.append(evaluate(model, val_dataloader)[0])
+
+        selected_data = train_data[:1]
+        # selected_index = np.argmin(scores)
+        # selected_data = train_data[selected_index : selected_index + 1]
+
+        model.load_state_dict(model_state_copy)
+        optimizer.load_state_dict(optimizer_state_copy)
+        del model_state_copy, optimizer_state_copy
+
+        train(model, optimizer, selected_data)
+        ref_loss = evaluate(model, val_dataloader)
+        print(f"Step {i}, eval loss: {ref_loss}")
+
+        if args.rank == 8:
+            wandb.log(
+                {
+                    "ref_loss": ref_loss[0],
+                    "step": i + 1,
+                    "lr": optimizer.param_groups[0]["lr"],
+                }
+            ) 
+
+        if (i + 1) % 200 == 0:
+            with FSDP.state_dict_type(
+                model,
+                StateDictType.FULL_STATE_DICT,
+                FullStateDictConfig(offload_to_cpu=True, rank0_only=True),
+            ):
+                os.makedirs(f"{args.resume[:-3]}/random_{i+1}", exist_ok=True)
+                torch.save(
+                    {"state_dict": model.state_dict()},
+                    f"{args.resume[:-3]}/random_{i+1}/epoch_6.pt",
                 )
-                processed_ds = Dataset.from_list(oracle, features=features)
-                processed_ds.save_to_disk(ocache)

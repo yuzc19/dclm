@@ -1,12 +1,13 @@
 import os
-import time
-import math
+import glob
 import torch
+import fsspec
 import random
 import functools
 import numpy as np
 from tqdm import tqdm
 from torch import optim
+from contextlib import nullcontext
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from open_lm.params import parse_args
@@ -22,8 +23,6 @@ from torch.distributed.fsdp import (
     MixedPrecision,
     BackwardPrefetch,
     ShardingStrategy,
-    FullStateDictConfig,
-    StateDictType,
     CPUOffload,
 )
 
@@ -59,23 +58,29 @@ def load_optimizer(args, model, optimizer):
     return osd
 
 
-def train(model, optimizer, train_data):
-    optimizer.zero_grad()
+def train(model, optimizer, train_data, accumulation=False):
     loss = CrossEntropyLossWithZLoss()
     autocast = get_autocast("amp_bfloat16")
-    with autocast():
-        inputs, targets = (
-            train_data[:, :-1].contiguous().long().cuda(),
-            train_data[:, 1:].contiguous().long().cuda(),
-        )
-        out, _, _ = model(inputs)
-        total_loss = loss(out.reshape(-1, model.vocab_size), targets.reshape(-1))
-    total_loss.backward()
-    if isinstance(model, FSDP):
-        model.clip_grad_norm_(1, norm_type=2.0)
-    else:
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1, norm_type=2.0)
-    optimizer.step()
+    maybe_no_sync = nullcontext
+    # Don't sync gradients until the final batch for FSDP.
+    if isinstance(model, FSDP) and accumulation:
+        maybe_no_sync = model.no_sync
+    with maybe_no_sync():
+        with autocast():
+            inputs, targets = (
+                train_data[:, :-1].contiguous().long().cuda(),
+                train_data[:, 1:].contiguous().long().cuda(),
+            )
+            out, _, _ = model(inputs)
+            total_loss = loss(out.reshape(-1, model.vocab_size), targets.reshape(-1))
+        total_loss.backward()
+    if not accumulation:
+        if isinstance(model, FSDP):
+            model.clip_grad_norm_(1, norm_type=2.0)
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1, norm_type=2.0)
+        optimizer.step()
+    return total_loss.item()
 
 
 @torch.no_grad()
@@ -85,26 +90,23 @@ def evaluate(model, val_dataloader):
     loss = torch.nn.CrossEntropyLoss(reduction="none")
     autocast = get_autocast("amp_bfloat16")
     with autocast():
-        total_loss = 0.0
-        cnt = 0
+        all_loss = []
         for batch in val_dataloader:
             inputs, targets = batch["input_ids"][:, :-1], batch["labels"][:, 1:]
             out, _, _ = model(inputs)  # [bs, seq_len, vocab_size]
-            targets = targets.reshape(-1)
-            cur_loss = loss(out.reshape(-1, model.vocab_size), targets)
-            total_loss += cur_loss[targets != -100].mean().item()
-            cnt += 1
+            cur_loss = loss(out.reshape(-1, model.vocab_size), targets.reshape(-1))
+            cur_loss = cur_loss.reshape(inputs.size(0), -1)  # [bs, seq_len]
+            mask = targets != -100
+            masked_loss = (cur_loss * mask).sum(dim=1) / mask.sum(dim=1)
+            all_loss.extend(masked_loss.cpu().tolist())
 
     model.train()
-    return [total_loss / cnt]
+    return all_loss
 
 
 def main(args):
     args = parse_args(args)
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_01_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_1.pt"
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_0_fasttext_10000-data_influence_model-flan-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_6.pt"
-    # args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_1_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_2.pt"
-    args.resume = "/home/zichunyu/out/dclm_logs/baseline_01_1_fasttext-open_lm_1b_swiglutorch-warm=5000-lr=0p003-wd=0p033-cd=3e-05-bs=256-mult=1-seed=124-tokens=28795904000/checkpoints/epoch_1.pt"
+    args.resume = "/project/flame/zichunyu/out/dclm_logs/baseline_01_01_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_5.pt"
 
     if torch.cuda.is_available():
         # This enables tf32 on Ampere GPUs which is only 8% slower than
@@ -116,9 +118,7 @@ def main(args):
 
     device = init_distributed_device(args)
     random_seed(args.seed, 0)
-    with torch.device(
-        "meta" if args.experimental_meta_device and args.fsdp else args.device
-    ):
+    with torch.device(args.device):
         model = create_model(args)
 
     random_seed(args.seed, args.rank)
@@ -212,9 +212,10 @@ def main(args):
     )
     osd = load_optimizer(args, model, optimizer)
 
-    probe_data = "/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/train.pt"
-    # probe_data = "/home/zichunyu/out/refinedweb_01_0/fasttext/fasttext_filter/fineweb-edu-prediction/processed_data/pythia_tokenized/train.pt"
-    train_dataset = torch.load(probe_data)
+    probe_data = "/project/flame/zichunyu/data/shard_0-99.pt"
+    of = fsspec.open(probe_data, "rb")
+    with of as f:
+        train_dataset = torch.load(f)
     dataset_len = len(train_dataset)
     print(dataset_len)
 
@@ -225,74 +226,42 @@ def main(args):
         x = pad_sequence(input_ids, batch_first=True, padding_value=0)
         y = pad_sequence(labels, batch_first=True, padding_value=-100)
 
-        x = x[:, :2048]
-        y = y[:, :2048]
+        x = x[:, -2048:]
+        y = y[:, -2048:]
 
         return {"input_ids": x, "labels": y}
 
+    val_data = []
+    # mmlu_path = "/project/flame/zichunyu/data/mmlu"
+    # for val_path in sorted(glob.glob(os.path.join(mmlu_path, "*/val.pt"))):
+    #     val_data += torch.load(val_path)[:5]
+    arce_path = "/project/flame/zichunyu/data/arce-lm/train-1024.pt"
+    val_data += torch.load(arce_path)[:32]
+    hellaswag_path = "/project/flame/zichunyu/data/hellaswag/train-1024.pt"
+    val_data += torch.load(hellaswag_path)[:32]
     val_dataloader = DataLoader(
-        # torch.load("/home/zichunyu/data/lambada_openai/train-1024.pt"),
-        torch.load("/home/zichunyu/data/tulu/train-1024.pt")[:128],
-        # torch.load("/home/zichunyu/data/oh/train.pt")[:64]
-        # + torch.load("/home/zichunyu/data/eli5/train.pt")[:64],
+        val_data,
         batch_size=64,
         collate_fn=val_collate_fn,
     )
 
-    # def get_wsd_lr(learning_rate, it) -> float:
-    #     if it < 10:
-    #         return learning_rate * it / 10
-    #     if it < 50:
-    #         return learning_rate
-    #     return learning_rate * math.pow(0.5, (it - 50) / (50))
-
     seed = int(os.environ.get("SEED"))
-    print("SEED:", seed)
-    np.random.seed(seed)
-    left, right = seed * 10000, seed * 10000 + 10000
-    ocache = f"{args.resume[:-3]}/oracle/{seed}"
+    left, right = seed * 128000, seed * 128000 + 128000
+    ocache = f"baseline_01_01_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_5/oracle/{seed}"
     oracle = []
 
-    # model.load_state_dict(sd)
-    # optimizer.load_state_dict(osd)
-    # init_lr = optimizer.param_groups[0]["lr"]
-    # print("init_lr: ", init_lr)
-    # for i in tqdm(range(50)):
-    #     lr = get_wsd_lr(init_lr, i)
-    #     for param_group in optimizer.param_groups:
-    #         param_group["lr"] = lr
-    #     train(model, optimizer, train_dataset[i])
-    #     if i == 49:
-    #         torch.save(
-    #             model.state_dict(),
-    #             f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/model-50-{args.rank}.pt",
-    #         )
-    #         torch.save(
-    #             optimizer.state_dict(),
-    #             f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/optimizer-50-{args.rank}.pt",
-    #         )
-    # sd = torch.load(f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/model-50-{args.rank}.pt")
-    # osd = torch.load(f"/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/pythia_tokenized/optimizer-50-{args.rank}.pt")
-    # exit(0)
-
-    eval_base = evaluate(model, val_dataloader)[0]
+    model.train()
     for i in tqdm(range(left, right)):
         model.load_state_dict(sd)
         optimizer.load_state_dict(osd)
-        train_index, probe_index = np.random.permutation(dataset_len)[:2]
-        train_index = i
-        train_data = train_dataset[train_index]
-        probe_data = train_dataset[probe_index]
-        scores = []
-        train(model, optimizer, train_data)
-        scores.append(evaluate(model, val_dataloader)[0] - eval_base)
+        probe_data = train_dataset[i]
+        input_ids = probe_data[0][:-1].cpu().numpy().tolist()
         train(model, optimizer, probe_data)
-        scores.append(evaluate(model, val_dataloader)[0] - eval_base)
+        scores = evaluate(model, val_dataloader)
 
         oracle.append(
             {
-                "input_ids": train_data[0][:-1].cpu().numpy().tolist()
-                + probe_data[0][:-1].cpu().numpy().tolist(),
+                "input_ids": input_ids,
                 "scores": scores,
             }
         )
