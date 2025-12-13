@@ -524,7 +524,7 @@ def main():
 
     CWD = os.getcwd()
     if args.use_temp_working_dir:
-        temp_dir = os.path.join(CWD, "eval_openlm_ckpt_temp_dirs")
+        temp_dir = os.path.join(CWD, f"eval_openlm_ckpt_temp_dirs_{os.environ['c']}")
         os.makedirs(temp_dir, exist_ok=True)  # in case rank > 0
         os.chdir(temp_dir)
         print(f"Using temporary working directory: {temp_dir}")
