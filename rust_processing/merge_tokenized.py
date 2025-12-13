@@ -8,25 +8,25 @@ import os
 # 3. Create a new manifest file that includes entries from both datasets (each line in the manifest file is just like {"num_sequences":8192,"shard":"shard_00000914"})
 
 # Create merged directory
-merged_dir = "/tmp/data/fasttext-7.2B_prox-21.6B_merged/tokenized"
+merged_dir = "/tmp/data/fasttext-3.6B_repro-3.6B_merged/tokenized"
 os.makedirs(merged_dir, exist_ok=True)
 
 
 # Copy files from first dataset
-src1 = "/tmp/data/fasttext_0.1/tokenized_7.2B"
+src1 = "/tmp/data/fasttext_0.1/tokenized_3.6B"
 for file in os.listdir(src1):
     if file.endswith(".tar"):
         shutil.copy2(f"{src1}/{file}", f"{merged_dir}/{file.replace('.tar', '_1.tar')}")
 
 # Copy files from second dataset
-src2 = "/tmp/data/prox/fasttext_21.6B/tokenized"
+src2 = "/tmp/data/fasttext_3.6B/tokenized"
 for file in os.listdir(src2):
     if file.endswith(".tar"):
         shutil.copy2(f"{src2}/{file}", f"{merged_dir}/{file.replace('.tar', '_2.tar')}")
 
 manifest = []
 # Read and process first manifest
-manifest1_path = "/tmp/data/fasttext_0.1/tokenized_7.2B/manifest.jsonl"
+manifest1_path = "/tmp/data/fasttext_0.1/tokenized_3.6B/manifest.jsonl"
 with open(manifest1_path, "r") as f:
     for line in f:
         entry = json.loads(line.strip())
@@ -34,12 +34,10 @@ with open(manifest1_path, "r") as f:
         manifest.append(entry)
 
 # Read and process second manifest
-manifest2_path = ("/tmp/data/prox/fasttext_21.6B/tokenized/manifest.jsonl")
+manifest2_path = ("/tmp/data/fasttext_3.6B/tokenized/manifest.jsonl")
 with open(manifest2_path, "r") as f:
     for line in f:
         entry = json.loads(line.strip())
-        # if int(entry["shard"].split("_")[1]) >= 418:
-        #     continue
         entry["shard"] = entry["shard"] + "_2"
         manifest.append(entry)
 
