@@ -98,7 +98,9 @@ def list_shard_files(data_dirpath, num_shards=None, shard_list_file=None, shard_
 
     assert bool(shard_list_file) ^ bool(data_dirpath), "Either shard_list_file or data_dirpath must be provided, but not both."
 
-    if shard_list_file is not None:
+    if not data_dirpath.startswith("s3://"):
+        shard_files = [os.path.basename(path) for path in glob.glob(data_dirpath + "/*.jsonl*")]
+    elif shard_list_file is not None:
         with open(shard_list_file, "r") as f:
             shard_files = f.read().splitlines()
     else:
