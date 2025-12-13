@@ -3,7 +3,7 @@
     "name": "baseline_01_01_fasttext",
     "creation_date": "2024_08_22-01_15_06",
     "dataset_url": "baseline_01_01_fasttext_tokenized",
-    "manifest_url": "/data/datasets/hf_cache/baseline_01_0_fasttext_tokenized/manifest.jsonl /data/datasets/hf_cache/baseline_01_1_fasttext_tokenized/manifest.jsonl",
+    "manifest_url": "gs://cmu-gpucloud-zichunyu/data/baseline_01_0_fasttext_tokenized/manifest.jsonl gs://cmu-gpucloud-zichunyu/data/baseline_01_1_fasttext_tokenized/manifest.jsonl",
     "sources": [
         {
             "uuid": "f12dc026-cc4a-4203-ba9f-9ba08c5945f9",
