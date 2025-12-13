@@ -26,17 +26,20 @@
 # python -m open_lm.utils.make_wds_manifest  --data-dir $DATA_DIR/${DATASET_NAME}_tokenized  --num-workers 64
 # python make_correct_json.py $DATA_DIR/${DATASET_NAME}_tokenized
 
-BASE_DIR=/data/datasets/hf_cache
-SPILL_LOCATION=/scratch/$(whoami)/tmp/ray
+SPILL_LOCATION=/tmp/ray
 mkdir -p $SPILL_LOCATION
 ray start --head --port=6379 --temp-dir=$SPILL_LOCATION
 
+gcloud storage cp -r gs://cmu-gpucloud-zichunyu/data/dclm28b/textfiles /tmp/dataset/dclm28b
+
 PYTHONPATH=$(pwd) python ray_processing/tokenize_shuffle.py \
-    --source_ref_paths exp_data/datasets/untokenized/fasttext.json \
-    --output $BASE_DIR/baseline_01_1_fasttext_tokenized \
+    --source_ref_paths exp_data/datasets/untokenized/fasttext_01_0.json \
+    --output /tmp/dataset/dclm28b/tokenized \
     --ray_spill_location $SPILL_LOCATION \
-    --tokenizer ~/CODE/lit-gpt/checkpoints/EleutherAI/pythia-410m \
-    --readable_name baseline_01_1_fasttext
+    --tokenizer tokenization_configs/pythia-410m \
+    --readable_name dclm28b
+
+gcloud storage cp -r /tmp/dataset/dclm28b/tokenized gs://cmu-gpucloud-zichunyu/data/dclm28b
 
 # python ray_processing/tokenize_shuffle.py \
 #     --source_ref_paths exp_data/datasets/raw_sources/test.json \
