@@ -37,7 +37,7 @@ def gen_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--eval_meta_data",
-        default=f"{os.path.dirname(__file__)}/eval_meta_data.csv",
+        default="eval/eval_meta_data.csv",
         help="Eval meta data file",
     )
     parser.add_argument("--eval_results", help="Eval results")
@@ -52,11 +52,16 @@ def get_aggregated_results(data, eval_metadata):
         eval_metadata["results"].astype(float)
         - 0.01 * eval_metadata["Random baseline"].astype(float)
     ) / (1.0 - 0.01 * eval_metadata["Random baseline"].astype(float))
-    # print(eval_metadata)
-    # result_list = []
+    eval_metadata = eval_metadata[eval_metadata["Eval Task"] != "commonsense_qa"]
+    # eval_metadata = eval_metadata[eval_metadata["Eval Task"] != "boolq"]
+    result_list = []
     task_categories = sorted(eval_metadata["Task Category"].unique())
+    task_categories.append("Core")
     for c in task_categories:
-        eval_df = eval_metadata[eval_metadata["Task Category"] == c]
+        if c == "Core":
+            eval_df = eval_metadata
+        else:
+            eval_df = eval_metadata[eval_metadata["Task Category"] == c]
         sorted_df = eval_df.sort_values(by="Eval Task")
         filtered_df = sorted_df[sorted_df["Eval Task"].isin(low_variance_datasets)]
         c_sum, c_num = 0, 0
@@ -68,6 +73,8 @@ def get_aggregated_results(data, eval_metadata):
             continue
         c_avg = c_sum / c_num
         print(c, c_avg)
+        result_list.append(c_avg)
+    return result_list
 
 
 def main():
@@ -80,6 +87,10 @@ def main():
         data = json.load(f)
 
     data = get_aggregated_results(data, eval_metadata)
+
+    with open(args.eval_results.replace(".json", ".csv"), "w") as f:
+        for d in data:
+            f.write(f" {d:.5f} &")
 
 
 if __name__ == "__main__":
