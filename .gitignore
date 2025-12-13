@@ -222,3 +222,5 @@ run.sh
 launch.sh
 .torchxconfig
 refinedweb_banned_domains_curated.txt
+
+exp_data/models/*
