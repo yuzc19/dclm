@@ -19,11 +19,13 @@ def mates_select(dataset_size, selection_size, args):
         ]
     )
     metrics = np.array(dataset["prediction"]).reshape(-1)
+    # metrics = np.load(f"{args.output_dir}/prediction.npy")
     print(">> Metrics shape:", metrics.shape)
     metrics = metrics / args.temp
     # Gumbel-Top-$k$ algorithm
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed=1234)
     gumbel_noise = rng.gumbel(size=len(metrics))
+    print(metrics.mean(), metrics.std(), gumbel_noise.mean(), gumbel_noise.std())
     metrics += gumbel_noise
     return np.argpartition(metrics, selection_size)[:selection_size]
 
@@ -82,9 +84,9 @@ def load_dataset(data_dir, shard_names, max_workers=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_dir", type=str, default="/data/datasets/hf_cache")
+    parser.add_argument("--base_dir", type=str, default="/home/zichunyu")
     parser.add_argument("--model_name", type=str, default="pythia-1b")
-    parser.add_argument("--method", type=str, default="fineweb-edu")
+    parser.add_argument("--method", type=str, default="mates")
     parser.add_argument("--shard_num", type=float, default=8)
     parser.add_argument("--ratio", type=int, default=2)
     parser.add_argument("--ckpt", type=int, default=0)
@@ -93,31 +95,36 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    args.output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/fineweb-edu-prediction"
+    # args.output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/10000-data_influence_model-flan-prediction"
+    args.output_dir = f"{args.base_dir}/out/dclm_logs/baseline_01_1_fasttext-d=1024_l=24_h=8-warm=2000-lr=0p003-wd=0p033-cd=3e-05-bs=512-mult=4-seed=124-tokens=32929300480/checkpoints/epoch_2/pairwise-dim-lam-prediction-0"
 
     out_dir = Path(f"{args.output_dir}/processed_data")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    data_dir = f"{args.base_dir}/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
+    data_dir = f"{args.base_dir}/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
     file_list = [
         os.path.abspath(os.path.join(data_dir, f))
         for f in os.listdir(data_dir)
         if not f.startswith(".")
     ]
     shard_names = [file.split("/")[-1].split("_bert")[0] for file in file_list]
-    file_dir = "/data/datasets/hf_cache/refinedweb_01_0/fasttext/fasttext_filter/processed_data/{}.jsonl.zstd"
+    file_dir = "/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/{}.jsonl.zstd"
 
-    shard_sizes = []
-    for shard_name in tqdm(shard_names):
-        shard_file = file_dir.format(shard_name)
-        count = sum(1 for _ in read_jsonl(shard_file))
-        shard_sizes.append(count)
-    dataset_size = sum(shard_sizes)
-    print(f">> Total dataset size: {dataset_size}")
+    # shard_sizes = []
+    # for shard_name in tqdm(shard_names):
+    #     shard_file = file_dir.format(shard_name)
+    #     count = sum(1 for _ in read_jsonl(shard_file))
+    #     shard_sizes.append(count)
+    # dataset_size = sum(shard_sizes)
+    # print(f">> Total dataset size: {dataset_size}")
 
+    # 7860915 (from lam and flan)
+    dataset_size = 29478616
     selection_size = dataset_size // args.ratio
     indices = get_indices(dataset_size, selection_size, args)
     print(f">> Max index: {max(indices)}")
+    np.save(f"{args.output_dir}/indices-{args.ratio}-{args.temp}.npy", indices)
+    exit(0)
 
     selected_indices_set = set(indices)
     global_offset = 0
