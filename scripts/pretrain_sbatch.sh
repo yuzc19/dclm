@@ -1,28 +1,61 @@
 #!/bin/bash
-#SBATCH --job-name=dclm_pretrain
-#SBATCH --output=slurm_logs/dclm_%j.out
-#SBATCH --error=slurm_logs/dclm_%j.err
-#SBATCH --partition=preempt
-#SBATCH --gres=gpu:A6000:8
-#SBATCH --exclude=shire-1-6,shire-1-10,babel-0-37,babel-1-23,babel-1-27,babel-1-31,babel-13-13,babel-13-29,babel-15-32,babel-15-36
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=128G
+#SBATCH --job-name=pretrain
+#SBATCH --output=logs/pretrain_%j.out
+#SBATCH --error=logs/pretrain_%j.err
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:8
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=512G
 #SBATCH --time=2-00:00:00
-
-#SBATCH --mem-per-gpu=64G
 
 # print commands
 set -x
 
-export WANDB_DIR="/home/zichunyu/tmp"
+cd /project/flame/zichunyu/code/dclm
+export WANDB_DIR="/tmp/wandb"
 mkdir -p $WANDB_DIR
 
-torchrun --nproc-per-node 8 -m training.train -- \
-  --scale 1b_1x_fast \
-  --data-config exp_data/datasets/tokenized/baseline_01_1_fasttext.json \
-  --logs /home/zichunyu/out/dclm_logs \
+TORCH_ARGS=(
+    --nnodes $SLURM_NNODES
+    --node_rank $SLURM_NODEID
+    --nproc_per_node $NPROC_PER_NODE
+    --rdzv-id $SLURM_JOB_ID
+    --rdzv-backend c10d
+    # --rdzv-endpoint $MASTER_ADDR:$MASTER_PORT
+    --rdzv-endpoint orchard-flame-9:29500
+)
+
+TMPDIR=$WANDB_DIR torchrun --nproc-per-node 8 -m training.train -- \
+  --scale 411m_4x_cooldown \
+  --data-config exp_data/datasets/tokenized/baseline_01_0_fasttext_3.6B.json \
+  --logs /tmp/dclm_logs \
+  --num-checkpoints 8 \
   --multiple-data-passes \
   --report-to-wandb
+
+# TMPDIR=$WANDB_DIR torchrun ${TORCH_ARGS[@]} -m training.train -- \
+#   --scale 411m_10x \
+#   --data-config exp_data/datasets/tokenized/baseline_01_0_fasttext_merged.json \
+#   --logs /tmp/dclm_logs \
+#   --num-checkpoints 11 \
+#   --multiple-data-passes \
+#   --report-to-wandb
+
+# TMPDIR=$WANDB_DIR torchrun ${TORCH_ARGS[@]} -m training.train -- \
+#   --scale 411m_4x \
+#   --data-config exp_data/datasets/tokenized/baseline_01_0_fasttext_epoch_2-data_influence_model-flan.json \
+#   --logs /project/flame/zichunyu/out/dclm_logs \
+#   --multiple-data-passes \
+#   --report-to-wandb
+
+# TMPDIR=$WANDB_DIR torchrun ${TORCH_ARGS[@]} -m training.train -- \
+#   --scale 3b_1x_fast_3e-3_lr_1e-4_zloss \
+#   --data-config exp_data/datasets/tokenized/baseline_01_01_fasttext.json \
+#   --logs /project/flame/zichunyu/out/dclm_logs \
+#   --pretrained /project/flame/zichunyu/out/dclm_logs/baseline_01_01_fasttext-open_lm_3b_swiglutorch-warm=5000-lr=0p003-wd=0p033-cd=3e-05-bs=256-mult=1-seed=124-tokens=55918643200/checkpoints/epoch_6.pt \
+#   --load-pretrained-state \
+#   --multiple-data-passes \
+#   --report-to-wandb
 
 # DATA_DIR=$1
 # DATASET_NAME=$2
