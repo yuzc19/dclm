@@ -10,7 +10,7 @@ from file_utils import list_dir, read_jsonl
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_dir", type=str, default="/data/datasets/hf_cache")
+    parser.add_argument("--base_dir", type=str, default="/tmp/data")
     parser.add_argument("--base", type=int, default=0)
     parser.add_argument("-S", "--shard", type=int, nargs=2, default=[0, 1])
     parser.add_argument("--map_batch_size", type=int, default=1024)
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    data_dir = f"{args.base_dir}/refinedweb_01_0/fasttext/fasttext_filter/processed_data"
+    data_dir = f"{args.base_dir}/fasttext_0.1/3.6B_data"
     file_list = list_dir(data_dir)
     shard_size = len(file_list) // args.shard[1]
     file_list = file_list[
@@ -44,7 +44,7 @@ if __name__ == "__main__":
             continue
 
         shard_name = file.split("/")[-1].split(".")[0]
-        output_dir = f"{args.base_dir}/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized/{shard_name}"
+        output_dir = f"{args.base_dir}/fasttext_0.1/3.6B_data/bert_tokenized/{shard_name}"
 
         dataset = []
         for json_line in read_jsonl(file):

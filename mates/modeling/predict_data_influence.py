@@ -20,13 +20,13 @@ class ModelAnnotator:
         )
         self.model.eval()
 
-        self.bge = AutoModel.from_pretrained("BAAI/bge-base-en-v1.5")
-        self.bge.eval()
+        # self.bge = AutoModel.from_pretrained("BAAI/bge-base-en-v1.5")
+        # self.bge.eval()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device {self.device}")
         self.model.to(self.device)
-        self.bge.to(self.device)
+        # self.bge.to(self.device)
 
     def __getstate__(self):
         return {
@@ -79,9 +79,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    data_dir = f"{args.base_dir}/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/bert_tokenized"
-    # model_dir = f"{args.base_dir}/out/1b-data_influence_model"
-    output_dir = f"{args.base_dir}/out/refinedweb_01_0/fasttext/fasttext_filter/1b-data_influence_model-prediction"
+    data_dir = f"/tmp/data/fasttext_0.1/3.6B_data/bert_tokenized"
+    model_dir = f"/project/flame/zichunyu/out/10000-data_influence_model-flan"
+    output_dir = f"/tmp/data/fasttext_0.1/3.6B_data/10000-data_influence_model-flan-prediction"
 
     file_list = [
         os.path.abspath(os.path.join(data_dir, f))

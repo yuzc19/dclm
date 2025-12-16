@@ -110,21 +110,21 @@ if __name__ == "__main__":
     shard_names = [file.split("/")[-1].split("_bert")[0] for file in file_list]
     file_dir = "/home/zichunyu/data/refinedweb_01_0/fasttext/fasttext_filter/processed_data/{}.jsonl.zstd"
 
-    # shard_sizes = []
-    # for shard_name in tqdm(shard_names):
-    #     shard_file = file_dir.format(shard_name)
-    #     count = sum(1 for _ in read_jsonl(shard_file))
-    #     shard_sizes.append(count)
-    # dataset_size = sum(shard_sizes)
+    shard_sizes = []
+    for shard_name in tqdm(shard_names):
+        shard_file = file_dir.format(shard_name)
+        count = sum(1 for _ in read_jsonl(shard_file))
+        shard_sizes.append(count)
+    dataset_size = sum(shard_sizes)
     # print(f">> Total dataset size: {dataset_size}")
 
     # 7860915 (from lam and flan)
     dataset_size = 29478616
     selection_size = dataset_size // args.ratio
     indices = get_indices(dataset_size, selection_size, args)
-    print(f">> Max index: {max(indices)}")
-    np.save(f"{args.output_dir}/indices-{args.ratio}-{args.temp}.npy", indices)
-    exit(0)
+    # print(f">> Max index: {max(indices)}")
+    # np.save(f"{args.output_dir}/indices-{args.ratio}-{args.temp}.npy", indices)
+    # exit(0)
 
     selected_indices_set = set(indices)
     global_offset = 0
